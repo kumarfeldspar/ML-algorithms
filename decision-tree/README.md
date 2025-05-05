@@ -1,140 +1,128 @@
+# Decision Tree
+
+This repository contains a Python implementation of a decision tree algorithm. The decision tree is a popular machine learning algorithm used for both classification and regression tasks. This implementation provides classes for building decision trees for classification and regression purposes.
+
+## Decision Tree Overview
+
+<img align="right" width=200px src="binary_tree.png" />
+A decision tree is a hierarchical structure that makes predictions by recursively partitioning the input data based on a set of splitting rules. At each node of the tree, a decision is made based on the value of a specific feature. The tree branches out into multiple child nodes based on the possible feature values, leading to a series of decision nodes and leaf nodes.<br><br>
+
+The decision nodes compare feature values against a splitting threshold, while the leaf nodes represent the final predictions. In classification tasks, leaf nodes typically predict the most common class in the corresponding subset of data, while in regression tasks, leaf nodes predict the average value of the target variable.
+
+## Files
+
+The `dtree.py` file in this repository contains the implementation of the decision tree algorithm. It includes the following classes:
+
+- `DecisionNode`: Represents a decision node in the decision tree. It stores the column index of the feature to split on, the splitting threshold, and references to the left and right child nodes.
+- `LeafNode`: Represents a leaf node in the decision tree. It stores the target values and the prediction based on those values.
+- `DecisionTree621`: Base class for decision tree models. It provides methods for fitting the tree to the data and making predictions.
+- `RegressionTree621`: Subclass of `DecisionTree621` specialized for regression tasks. It uses the MSE as the loss function.
+- `ClassifierTree621`: Subclass of `DecisionTree621` specialized for classification tasks. It uses the Gini impurity as the loss function.
+
+## Usage
+
+To use the decision tree implementation, follow these steps:
+
+1. Import the necessary libraries:
+
+```python
 import numpy as np
 from scipy import stats
 from sklearn.metrics import r2_score, accuracy_score
+```
 
+2. Import the decision tree classes from `dtree.py`:
 
-class DecisionNode:
-    def __init__(self, col, split, lchild, rchild):
-        self.col = col
-        self.split = split
-        self.lchild = lchild
-        self.rchild = rchild
+```python
+from dtree import DecisionTree621, RegressionTree621, ClassifierTree621
+```
 
-    def predict(self, x_test):
-        # Make decision based upon x_test[col] and split
-        if x_test[self.col] < self.split:
-            return self.lchild.predict(x_test)
-        return self.rchild.predict(x_test)
+3. Create an instance of the desired decision tree class:
 
+```python
+# For regression tasks
+reg_tree = RegressionTree621(min_samples_leaf=1)
 
-class LeafNode:
-    def __init__(self, y, prediction):
-        "Create leaf node from y values and prediction; prediction is mean(y) or mode(y)"
-        self.n = len(y)
-        self.prediction = prediction
-        self.y = y
+# For classification tasks
+clf_tree = ClassifierTree621(min_samples_leaf=1)
+```
 
-    def predict(self, x_test):
-        # return prediction
-        self.prediction = stats.mode(self.y)[0][0]
-        return self.prediction
+4. Fit the decision tree to your training data:
 
+```python
+reg_tree.fit(X_train, y_train)  # X_train is the feature matrix, y_train is the target values
 
-def gini(x):
-    """
-    Return the gini impurity score for values in y
-    Assume y = {0,1}
-    Gini = 1 - sum_i p_i^2 where p_i is the proportion of class i in y
-    """
-    val_count = np.unique(x, return_counts=True)[1]
-    return 1 - np.sum((val_count / len(x)) ** 2)
+clf_tree.fit(X_train, y_train)  # X_train is the feature matrix, y_train is the class labels
+```
 
+5. Make predictions using the trained decision tree:
 
-def find_best_split(X, y, loss, min_samples_leaf):
-    best_feature, best_split, best_loss = -1, -1, loss(y)
-    for col in range(len(X[0])):
-        candidates = np.random.choice(X[:, col], 11)
-        for split in candidates:
-            yl, yr = y[X[:, col] < split], y[X[:, col] >= split]
-            if len(yl) < min_samples_leaf or len(yr) < min_samples_leaf:
-                continue
-            l = (len(yl) * loss(yl) + len(yr) * loss(yr)) / (len(yl) + len(yr))
-            if l == 0:
-                return col, split
-            if l < best_loss:
-                best_feature, best_split, best_loss = col, split, l
-    return best_feature, best_split
+```python
+reg_predictions = reg_tree.predict(X_test)  # X_test is the feature matrix for test data
 
+clf_predictions = clf_tree.predict(X_test)  # X_test is the feature matrix for test data
+```
 
-class DecisionTree621:
-    def __init__(self, min_samples_leaf=1, loss=None):
-        self.min_samples_leaf = min_samples_leaf
-        self.loss = loss  # loss function; either np.var for regression or gini for classification
+6. Evaluate the performance of the decision tree:
 
-    def fit(self, X, y):
-        """
-        Create a decision tree fit to (X,y) and save as self.root, the root of
-        our decision tree, for  either a classifier or regression.  Leaf nodes for classifiers
-        predict the most common class (the mode) and regressions predict the average y
-        for observations in that leaf.
+```python
+# For regression tasks, the score is the R^2 score
+reg_score = reg_tree.score(X_test, y_test)  # X_test is the feature matrix, y_test is the true target values
 
-        This function is a wrapper around fit_() that just stores the tree in self.root.
-        """
-        self.root = self.fit_(X, y)
+# For classification tasks, the score is the accuracy
+clf_score = clf_tree.score(X_test, y_test)  # X_test is the feature matrix, y_test is the true class labels
+```
 
-    def fit_(self, X, y):
-        """
-        Recursively create and return a decision tree fit to (X,y) for
-        either a classification or regression.  This function should call self.create_leaf(X,y)
-        to create the appropriate leaf node, which will invoke either
-        RegressionTree621.create_leaf() or ClassifierTree621.create_leaf() depending
-        on the type of self.
+## Example
 
-        This function is not part of the class "interface" and is for internal use, but it
-        embodies the decision tree fitting algorithm.
+Here is an example of how to use `ClassifierTree621` with sample data and the comparison with scikit-learn `DecisionTreeClassifier`:
 
-        (Make sure to call fit_() not fit() recursively.)
-        """
-        if len(X) <= self.min_samples_leaf or len(np.unique(X)) == 1:
-            return LeafNode(y, self.create_leaf(y))
-        col, split = find_best_split(X, y, self.loss, self.min_samples_leaf)
-        if col == -1:
-            return LeafNode(y, self.create_leaf(y))
-        lchild = self.fit_(X[X[:, col] < split], y[X[:, col] < split])
-        rchild = self.fit_(X[X[:, col] >= split], y[X[:, col] >= split])
-        return DecisionNode(col, split, lchild, rchild)
+```python
+from sklearn.datasets import load_iris
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
 
-    def predict(self, X_test):
-        """
-        Make a prediction for each record in X_test and return as array.
-        This method is inherited by RegressionTree621 and ClassifierTree621 and
-        works for both without modification!
-        """
-        pred = np.zeros((len(X_test),))
-        for i in range(len(X_test)):
-            pred[i] = self.root.predict(X_test[i])
-        return pred
+from dtree import *
 
+# Number of trials for evaluation
+ntrials = 5
 
-class RegressionTree621(DecisionTree621):
-    def __init__(self, min_samples_leaf=1):
-        super().__init__(min_samples_leaf, loss=np.var)
+# Minimum number of samples required to be at a leaf node
+min_samples_leaf = 1
 
-    def score(self, X_test, y_test):
-        "Return the R^2 of y_test vs predictions for each record in X_test"
-        return r2_score(y_test, self.predict(X_test))
+# Load the Iris dataset
+X, y = load_iris(return_X_y=True)
 
-    def create_leaf(self, y):
-        """
-        Return a new LeafNode for regression, passing y and mean(y) to
-        the LeafNode constructor.
-        """
-        leaf = LeafNode(y, np.mean(y))
-        return leaf
+# Lists to store scores
+scores = []
+sklearn_scores = []
 
+# Perform the trials
+for i in range(ntrials):
+    # Split the data into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20)
 
-class ClassifierTree621(DecisionTree621):
-    def __init__(self, min_samples_leaf=1):
-        super().__init__(min_samples_leaf, loss=gini)
+    # Create an instance of the ClassifierTree621 class and fit it to training data
+    dt = ClassifierTree621(min_samples_leaf=min_samples_leaf)
+    dt.fit(X_train, y_train)
 
-    def score(self, X_test, y_test):
-        "Return the accuracy_score() of y_test vs predictions for each record in X_test"
-        return accuracy_score(y_test, self.predict(X_test))
+    # Evaluate the ClassifierTree621 decision tree
+    score = dt.score(X_test, y_test)
+    scores.append(score)
 
-    def create_leaf(self, y):
-        """
-        Return a new LeafNode for classification, passing y and mode(y) to
-        the LeafNode constructor. Feel free to use scipy.stats to use the mode function.
-        """
-        leaf = LeafNode(y, stats.mode(y)[0][0])
-        return leaf
+    # Create and fit the sklearn decision tree
+    sklearn_dt = DecisionTreeClassifier(min_samples_leaf=min_samples_leaf, max_features=1.0)
+    sklearn_dt.fit(X_train, y_train)
+
+    # Evaluate the sklearn decision tree
+    sklearn_score = sklearn_dt.score(X_test, y_test)
+    sklearn_scores.append(sklearn_score)
+
+# Calculate and print the mean accuracy scores
+print(f"621 accuracy score: {np.mean(scores):.2f}")                # Output: "621 accuracy score: 0.96"
+print(f"sklearn accuracy score: {np.mean(sklearn_scores):.2f}")    # Output: "sklearn accuracy score: 0.96"
+```
+
+The example performs a comparative evaluation between `ClassifierTree621` and the decision tree implementation from scikit-learn (`DecisionTreeClassifier`) on the Iris dataset. It splits the dataset into training and test sets, fits both decision tree models to the training data, and evaluates their accuracy scores on the test data.
+
+The accuracy scores for both models are very close, with both achieving an accuracy of 0.96 on average. It indicates that `ClassifierTree621` is able to learn and make predictions with a similar level of accuracy as the scikit-learn model.
